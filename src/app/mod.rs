@@ -2,6 +2,7 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::time::{Duration, Instant};
 
+use crate::config::Config;
 use crate::themes::Theme;
 use crate::words::{WordList, generate_word_list, get_quote};
 
@@ -112,6 +113,9 @@ pub struct App {
     pub screen: Screen,
     pub should_quit: bool,
 
+    // Persisted config
+    pub config: Config,
+
     // Theme
     pub theme: Theme,
     pub theme_index: usize,
@@ -143,19 +147,43 @@ pub struct App {
 
 impl App {
     pub fn new() -> Result<Self> {
+        let config = Config::load();
+
+        // Resolve theme from config (fall back to index 0 if not found)
         let themes = Theme::all();
-        let theme = themes[0].clone();
-        let words = generate_word_list(&WordList::Common200, 50);
-        let word_states = words.iter().map(|w| WordState::new(w)).collect();
+        let theme_index = themes
+            .iter()
+            .position(|t| t.name == config.theme)
+            .unwrap_or(0);
+        let theme = themes[theme_index].clone();
+
+        let word_list = config.word_list();
+        let mode = config.test_mode();
+
+        let word_count = match &mode {
+            TestMode::Words(n) => *n,
+            TestMode::Time(_) => 200,
+            TestMode::Quote | TestMode::Zen => 0,
+        };
+        let words = if matches!(mode, TestMode::Quote) {
+            let quote = get_quote();
+            quote.split_whitespace().map(WordState::new).collect()
+        } else {
+            generate_word_list(&word_list, word_count)
+                .iter()
+                .map(|w| WordState::new(w))
+                .collect()
+        };
 
         Ok(Self {
             screen: Screen::Home,
             should_quit: false,
+            config,
             theme,
-            theme_index: 0,
-            mode: TestMode::Words(50),
-            word_list: WordList::Common200,
-            words: word_states,
+            theme_index,
+            mode,
+            word_list,
+            words,
             current_word: 0,
             current_input: String::new(),
             test_started: false,
@@ -198,33 +226,49 @@ impl App {
                     WordList::Common200 => WordList::Programming,
                     WordList::Programming => WordList::Common200,
                 };
+                self.config.word_list = Config::word_list_from(&self.word_list);
+                let _ = self.config.save();
             }
             KeyCode::Char('1') => {
                 self.mode = TestMode::Words(25);
+                self.config.default_mode = Config::test_mode_from(&self.mode);
+                let _ = self.config.save();
                 self.start_test();
             }
             KeyCode::Char('2') => {
                 self.mode = TestMode::Words(50);
+                self.config.default_mode = Config::test_mode_from(&self.mode);
+                let _ = self.config.save();
                 self.start_test();
             }
             KeyCode::Char('3') => {
                 self.mode = TestMode::Words(100);
+                self.config.default_mode = Config::test_mode_from(&self.mode);
+                let _ = self.config.save();
                 self.start_test();
             }
             KeyCode::Char('4') => {
                 self.mode = TestMode::Time(30);
+                self.config.default_mode = Config::test_mode_from(&self.mode);
+                let _ = self.config.save();
                 self.start_test();
             }
             KeyCode::Char('5') => {
                 self.mode = TestMode::Time(60);
+                self.config.default_mode = Config::test_mode_from(&self.mode);
+                let _ = self.config.save();
                 self.start_test();
             }
             KeyCode::Char('6') => {
                 self.mode = TestMode::Time(120);
+                self.config.default_mode = Config::test_mode_from(&self.mode);
+                let _ = self.config.save();
                 self.start_test();
             }
             KeyCode::Char('c') => {
                 self.mode = TestMode::Quote;
+                self.config.default_mode = Config::test_mode_from(&self.mode);
+                let _ = self.config.save();
                 self.start_test();
             }
             _ => {}
@@ -317,6 +361,8 @@ impl App {
             KeyCode::Enter => {
                 self.theme_index = self.theme_picker_selected;
                 self.theme = Theme::all()[self.theme_index].clone();
+                self.config.theme = self.theme.name.clone();
+                let _ = self.config.save();
                 self.screen = Screen::Home;
             }
             KeyCode::Up | KeyCode::Char('k') => {

@@ -112,20 +112,16 @@ fn draw_stats(f: &mut Frame, app: &App, area: Rect) {
 fn draw_words(f: &mut Frame, app: &App, area: Rect) {
     let theme = &app.theme;
     let width = area.width as usize;
-
-    // Build lines by wrapping words to fit the area width
-    let mut lines: Vec<Line> = Vec::new();
-    let mut current_spans: Vec<Span<'static>> = Vec::new();
-    let mut current_width = 0usize;
-
-    let words = &app.words;
     let current_word_idx = app.current_word;
 
-    for (word_idx, word) in words.iter().enumerate() {
-        let is_current = word_idx == current_word_idx;
+    // First pass: lay out every word into lines and record which line each word lands on.
+    let mut all_lines: Vec<Vec<Span<'static>>> = Vec::new();
+    let mut current_spans: Vec<Span<'static>> = Vec::new();
+    let mut current_width = 0usize;
+    let mut word_to_line: Vec<usize> = Vec::with_capacity(app.words.len());
 
-        // Build spans for this word
-        let word_spans = build_word_spans(word, is_current, app);
+    for (word_idx, word) in app.words.iter().enumerate() {
+        let is_current = word_idx == current_word_idx;
         let word_display_width: usize = word
             .expected
             .iter()
@@ -135,13 +131,11 @@ fn draw_words(f: &mut Frame, app: &App, area: Rect) {
         let needed = word_display_width + if current_width > 0 { 1 } else { 0 };
 
         if current_width > 0 && current_width + needed > width {
-            // If the current word is on this line and we're wrapping past it, stop rendering
-            if lines.len() >= 3 {
-                break;
-            }
-            lines.push(Line::from(std::mem::take(&mut current_spans)));
+            all_lines.push(std::mem::take(&mut current_spans));
             current_width = 0;
         }
+
+        word_to_line.push(all_lines.len());
 
         if current_width > 0 {
             current_spans.push(Span::styled(
@@ -151,20 +145,25 @@ fn draw_words(f: &mut Frame, app: &App, area: Rect) {
             current_width += 1;
         }
 
-        current_spans.extend(word_spans);
+        current_spans.extend(build_word_spans(word, is_current, app));
         current_width += word_display_width;
-
-        if lines.len() >= 3 {
-            break;
-        }
+    }
+    if !current_spans.is_empty() {
+        all_lines.push(current_spans);
     }
 
-    if !current_spans.is_empty() && lines.len() < 3 {
-        lines.push(Line::from(current_spans));
-    }
+    // Find which line the current word is on and start rendering from there.
+    let start_line = word_to_line
+        .get(current_word_idx)
+        .copied()
+        .unwrap_or(all_lines.len().saturating_sub(1));
 
-    // Only show 3 lines centered around the current word's line
-    let visible: Vec<Line> = lines.into_iter().take(3).collect();
+    let visible: Vec<Line> = all_lines
+        .into_iter()
+        .skip(start_line)
+        .take(3)
+        .map(Line::from)
+        .collect();
 
     let bg_style = Style::default().bg(theme.bg.to_color()).fg(theme.fg.to_color());
     f.render_widget(
