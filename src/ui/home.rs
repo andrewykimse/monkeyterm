@@ -28,7 +28,7 @@ pub fn draw(f: &mut Frame, app: &App) {
             Constraint::Fill(1),
             Constraint::Length(3),  // logo
             Constraint::Length(1),
-            Constraint::Length(9),  // menu
+            Constraint::Length(11), // menu
             Constraint::Fill(1),
             Constraint::Length(1),  // footer
         ])
@@ -48,7 +48,10 @@ pub fn draw(f: &mut Frame, app: &App) {
     f.render_widget(sub, chunks[2]);
 
     // Menu
+    let word_list_label = format!("word list  {}", app.word_list.name());
     let menu_items: Vec<Line> = vec![
+        make_menu_line("w", &word_list_label, theme),
+        blank_line(theme),
         make_menu_line("1", "words  25", theme),
         make_menu_line("2", "words  50", theme),
         make_menu_line("3", "words 100", theme),
@@ -78,7 +81,7 @@ pub fn draw(f: &mut Frame, app: &App) {
     footer(
         f,
         chunks[5],
-        &[("t", "theme"), ("q", "quit")],
+        &[("t", "theme"), ("w", "word list"), ("q", "quit")],
         theme,
     );
 }

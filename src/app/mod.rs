@@ -193,19 +193,22 @@ impl App {
                 self.theme_picker_selected = self.theme_index;
             }
             KeyCode::Char('q') => self.should_quit = true,
+            KeyCode::Char('w') => {
+                self.word_list = match self.word_list {
+                    WordList::Common200 => WordList::Programming,
+                    WordList::Programming => WordList::Common200,
+                };
+            }
             KeyCode::Char('1') => {
                 self.mode = TestMode::Words(25);
-                self.word_list = WordList::Common200;
                 self.start_test();
             }
             KeyCode::Char('2') => {
                 self.mode = TestMode::Words(50);
-                self.word_list = WordList::Common200;
                 self.start_test();
             }
             KeyCode::Char('3') => {
                 self.mode = TestMode::Words(100);
-                self.word_list = WordList::Common200;
                 self.start_test();
             }
             KeyCode::Char('4') => {
