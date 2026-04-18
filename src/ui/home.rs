@@ -67,7 +67,7 @@ pub fn draw(f: &mut Frame, app: &App) {
         .direction(Direction::Horizontal)
         .constraints([
             Constraint::Fill(1),
-            Constraint::Length(22),
+            Constraint::Length(24),
             Constraint::Fill(1),
         ])
         .split(chunks[3])[1];
