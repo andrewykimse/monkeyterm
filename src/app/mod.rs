@@ -149,6 +149,10 @@ pub struct App {
 
     // History
     pub history: History,
+
+    // WPM over time (one sample per elapsed second)
+    pub wpm_samples: Vec<f64>,
+    pub last_sample_second: u64,
 }
 
 impl App {
@@ -203,6 +207,8 @@ impl App {
             pb_delta: None,
             theme_picker_selected: 0,
             history: History::load(),
+            wpm_samples: Vec::new(),
+            last_sample_second: 0,
         })
     }
 
@@ -421,6 +427,8 @@ impl App {
         self.current_input.clear();
         self.live_wpm = 0.0;
         self.live_accuracy = 0.0;
+        self.wpm_samples.clear();
+        self.last_sample_second = 0;
 
         let count = match &self.mode {
             TestMode::Words(n) => *n,
@@ -490,6 +498,9 @@ impl App {
         let mode_label = self.mode.label();
         // Snapshot PB before adding new result so delta is vs previous best
         let prev_best = self.history.personal_best(&mode_label).map(|e| e.wpm);
+
+        // Final WPM sample
+        self.wpm_samples.push(wpm);
 
         let result = TestResult {
             wpm,
@@ -566,6 +577,13 @@ impl App {
             } else {
                 100.0
             };
+
+            // Push a WPM sample once per elapsed second
+            let current_second = elapsed.as_secs();
+            if current_second > self.last_sample_second {
+                self.wpm_samples.push(self.live_wpm);
+                self.last_sample_second = current_second;
+            }
         }
     }
 }
