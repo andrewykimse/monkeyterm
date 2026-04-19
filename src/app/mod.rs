@@ -271,6 +271,12 @@ impl App {
                 let _ = self.config.save();
                 self.start_test();
             }
+            KeyCode::Char('z') => {
+                self.mode = TestMode::Zen;
+                self.config.default_mode = Config::test_mode_from(&self.mode);
+                let _ = self.config.save();
+                self.start_test();
+            }
             _ => {}
         }
     }
@@ -417,7 +423,8 @@ impl App {
         let count = match &self.mode {
             TestMode::Words(n) => *n,
             TestMode::Time(_) => 200, // generate plenty
-            TestMode::Quote | TestMode::Zen => 0,
+            TestMode::Zen => 100,     // initial batch; auto-expands
+            TestMode::Quote => 0,
         };
 
         self.words = if matches!(self.mode, TestMode::Quote) {
@@ -448,8 +455,10 @@ impl App {
             }
         }
 
-        // Auto-expand for time mode
-        if matches!(self.mode, TestMode::Time(_)) && self.current_word >= self.words.len() - 20 {
+        // Auto-expand for time and zen modes
+        if matches!(self.mode, TestMode::Time(_) | TestMode::Zen)
+            && self.current_word >= self.words.len() - 20
+        {
             let extra = generate_word_list(&self.word_list, 50);
             self.words
                 .extend(extra.iter().map(|w| WordState::new(w)));

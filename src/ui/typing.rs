@@ -50,6 +50,15 @@ pub fn draw(f: &mut Frame, app: &App) {
 fn draw_stats(f: &mut Frame, app: &App, area: Rect) {
     let theme = &app.theme;
 
+    // Zen mode is distraction-free: no stats bar
+    if matches!(app.mode, TestMode::Zen) {
+        f.render_widget(
+            Paragraph::new("").style(Style::default().bg(theme.bg.to_color())),
+            area,
+        );
+        return;
+    }
+
     let wpm_text = if app.test_started {
         format!("{:.0} wpm", app.live_wpm)
     } else {
