@@ -28,7 +28,7 @@ pub fn draw(f: &mut Frame, app: &App) {
             Constraint::Fill(1),
             Constraint::Length(3),  // logo
             Constraint::Length(1),
-            Constraint::Length(11), // menu
+            Constraint::Length(13), // menu (incl. zen)
             Constraint::Length(9),  // personal bests
             Constraint::Fill(1),
             Constraint::Length(1),  // footer
@@ -62,6 +62,8 @@ pub fn draw(f: &mut Frame, app: &App) {
         make_menu_line("6", "time  120s", theme),
         blank_line(theme),
         make_menu_line("c", "quote", theme),
+        blank_line(theme),
+        make_menu_line("z", "zen", theme),
     ];
 
     let menu_area = Layout::default()
@@ -133,7 +135,7 @@ pub fn draw(f: &mut Frame, app: &App) {
     footer(
         f,
         chunks[6],
-        &[("t", "theme"), ("w", "word list"), ("q", "quit")],
+        &[("z", "zen"), ("t", "theme"), ("q", "quit")],
         theme,
     );
 }
