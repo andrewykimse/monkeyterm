@@ -1,6 +1,7 @@
 mod home;
 mod typing;
 mod results;
+mod settings;
 mod theme_picker;
 mod widgets;
 
@@ -13,6 +14,6 @@ pub fn draw(f: &mut Frame, app: &App) {
         Screen::Typing => typing::draw(f, app),
         Screen::Results => results::draw(f, app),
         Screen::ThemePicker => theme_picker::draw(f, app),
-        Screen::Settings => home::draw(f, app), // placeholder
+        Screen::Settings => settings::draw(f, app),
     }
 }
