@@ -2,7 +2,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::Paragraph,
+    widgets::{Paragraph, Sparkline},
     Frame,
 };
 
@@ -18,15 +18,19 @@ pub fn draw(f: &mut Frame, app: &App) {
     let full = f.area();
     f.render_widget(Paragraph::new("").style(bg_style), full);
 
+    let has_chart = !app.wpm_samples.is_empty();
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Fill(1),
-            Constraint::Length(1),  // logo
+            Constraint::Length(1),                            // logo
             Constraint::Length(2),
-            Constraint::Length(8),  // stats
+            Constraint::Length(8),                            // stats
+            Constraint::Length(if has_chart { 1 } else { 0 }), // gap
+            Constraint::Length(if has_chart { 4 } else { 0 }), // sparkline
             Constraint::Fill(1),
-            Constraint::Length(1),  // footer
+            Constraint::Length(1),                            // footer
         ])
         .split(full);
 
@@ -70,9 +74,31 @@ pub fn draw(f: &mut Frame, app: &App) {
         );
     }
 
+    // WPM sparkline
+    if has_chart {
+        let data: Vec<u64> = app.wpm_samples.iter().map(|&w| w as u64).collect();
+        let max = data.iter().max().copied().unwrap_or(1) + 10;
+
+        let chart_area = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Length(60),
+                Constraint::Fill(1),
+            ])
+            .split(chunks[5])[1];
+
+        let sparkline = Sparkline::default()
+            .data(&data)
+            .max(max)
+            .style(Style::default().fg(theme.main.to_color()).bg(theme.bg.to_color()));
+
+        f.render_widget(sparkline, chart_area);
+    }
+
     footer(
         f,
-        chunks[5],
+        chunks[7],
         &[("enter/r", "retry"), ("esc", "home")],
         theme,
     );
