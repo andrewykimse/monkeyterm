@@ -29,6 +29,7 @@ pub fn draw(f: &mut Frame, app: &App) {
             Constraint::Length(3),  // logo
             Constraint::Length(1),
             Constraint::Length(11), // menu
+            Constraint::Length(9),  // personal bests
             Constraint::Fill(1),
             Constraint::Length(1),  // footer
         ])
@@ -77,10 +78,61 @@ pub fn draw(f: &mut Frame, app: &App) {
         .alignment(Alignment::Left);
     f.render_widget(menu, menu_area);
 
+    // Personal bests
+    let pb_area = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Fill(1),
+            Constraint::Length(28),
+            Constraint::Fill(1),
+        ])
+        .split(chunks[4])[1];
+
+    let pb_modes = [
+        ("words 25", "w25"),
+        ("words 50", "w50"),
+        ("words 100", "w100"),
+        ("time 30s", "30s"),
+        ("time 60s", "60s"),
+        ("time 120s", "120s"),
+    ];
+
+    let mut pb_lines: Vec<Line> = vec![
+        Line::from(Span::styled(
+            "personal bests",
+            Style::default()
+                .fg(theme.sub.to_color())
+                .add_modifier(Modifier::DIM),
+        )),
+        blank_line(theme),
+    ];
+
+    for (mode_key, short) in &pb_modes {
+        let wpm_str = match app.history.personal_best(mode_key) {
+            Some(entry) => format!("{:.0}", entry.wpm),
+            None => "--".to_string(),
+        };
+        pb_lines.push(Line::from(vec![
+            Span::styled(
+                format!(" {short:<6}"),
+                Style::default().fg(theme.sub.to_color()),
+            ),
+            Span::styled(
+                format!("{:>4} wpm", wpm_str),
+                Style::default().fg(theme.main.to_color()),
+            ),
+        ]));
+    }
+
+    f.render_widget(
+        Paragraph::new(pb_lines).style(bg_style).alignment(Alignment::Left),
+        pb_area,
+    );
+
     // Footer
     footer(
         f,
-        chunks[5],
+        chunks[6],
         &[("t", "theme"), ("w", "word list"), ("q", "quit")],
         theme,
     );

@@ -24,7 +24,7 @@ pub fn draw(f: &mut Frame, app: &App) {
             Constraint::Fill(1),
             Constraint::Length(1),  // logo
             Constraint::Length(2),
-            Constraint::Length(8),  // stats
+            Constraint::Length(9),  // stats (8 lines + 1 pb line)
             Constraint::Fill(1),
             Constraint::Length(1),  // footer
         ])
@@ -53,7 +53,7 @@ pub fn draw(f: &mut Frame, app: &App) {
         let chars_s = format!("{} / {}", result.correct_chars, result.incorrect_chars);
         let time_s = format!("{:.1}s", result.duration.as_secs_f64());
 
-        let lines = vec![
+        let mut lines = vec![
             stat_line("wpm", &wpm_s, theme),
             stat_line("raw", &raw_s, theme),
             stat_line("acc", &acc_s, theme),
@@ -63,6 +63,9 @@ pub fn draw(f: &mut Frame, app: &App) {
             blank_line(theme),
             stat_line("mode", &result.mode, theme),
         ];
+
+        // Personal best delta
+        lines.push(pb_line(app.pb_delta, theme));
 
         f.render_widget(
             Paragraph::new(lines).style(bg_style).alignment(Alignment::Left),
@@ -76,6 +79,52 @@ pub fn draw(f: &mut Frame, app: &App) {
         &[("enter/r", "retry"), ("esc", "home")],
         theme,
     );
+}
+
+fn pb_line(pb_delta: Option<f64>, theme: &crate::themes::Theme) -> Line<'static> {
+    match pb_delta {
+        None => {
+            // First attempt — this run is the new PB
+            Line::from(vec![
+                Span::styled(
+                    format!("{:<10}", "pb"),
+                    Style::default().fg(theme.sub.to_color()),
+                ),
+                Span::styled(
+                    "new pb!".to_string(),
+                    Style::default()
+                        .fg(theme.main.to_color())
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ])
+        }
+        Some(delta) if delta >= 0.0 => {
+            Line::from(vec![
+                Span::styled(
+                    format!("{:<10}", "pb"),
+                    Style::default().fg(theme.sub.to_color()),
+                ),
+                Span::styled(
+                    format!("+{:.1} wpm", delta),
+                    Style::default()
+                        .fg(theme.main.to_color())
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ])
+        }
+        Some(delta) => {
+            Line::from(vec![
+                Span::styled(
+                    format!("{:<10}", "pb"),
+                    Style::default().fg(theme.sub.to_color()),
+                ),
+                Span::styled(
+                    format!("{:.1} wpm", delta),
+                    Style::default().fg(theme.sub.to_color()),
+                ),
+            ])
+        }
+    }
 }
 
 fn stat_line<'a>(label: &'a str, value: &'a str, theme: &crate::themes::Theme) -> Line<'a> {

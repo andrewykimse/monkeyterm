@@ -3,6 +3,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::time::{Duration, Instant};
 
 use crate::config::Config;
+use crate::history::History;
 use crate::themes::Theme;
 use crate::words::{WordList, generate_word_list, get_quote};
 
@@ -140,9 +141,14 @@ pub struct App {
 
     // Results
     pub last_result: Option<TestResult>,
+    /// Delta vs personal best at time of last result (None = first attempt).
+    pub pb_delta: Option<f64>,
 
     // Theme picker state
     pub theme_picker_selected: usize,
+
+    // History
+    pub history: History,
 }
 
 impl App {
@@ -194,7 +200,9 @@ impl App {
             live_wpm: 0.0,
             live_accuracy: 0.0,
             last_result: None,
+            pb_delta: None,
             theme_picker_selected: 0,
+            history: History::load(),
         })
     }
 
@@ -479,15 +487,24 @@ impl App {
             100.0
         };
 
-        self.last_result = Some(TestResult {
+        let mode_label = self.mode.label();
+        // Snapshot PB before adding new result so delta is vs previous best
+        let prev_best = self.history.personal_best(&mode_label).map(|e| e.wpm);
+
+        let result = TestResult {
             wpm,
             raw_wpm,
             accuracy,
             correct_chars: correct,
             incorrect_chars: incorrect,
             duration,
-            mode: self.mode.label(),
-        });
+            mode: mode_label,
+        };
+
+        self.pb_delta = prev_best.map(|pb| result.wpm - pb);
+        self.history.add(&result);
+        let _ = self.history.save();
+        self.last_result = Some(result);
     }
 
     fn count_chars(&self) -> (usize, usize) {

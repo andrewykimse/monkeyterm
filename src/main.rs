@@ -1,5 +1,6 @@
 mod app;
 mod config;
+mod history;
 mod ui;
 mod themes;
 mod words;
