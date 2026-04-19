@@ -81,7 +81,7 @@ pub fn draw(f: &mut Frame, app: &App) {
     footer(
         f,
         chunks[5],
-        &[("t", "theme"), ("w", "word list"), ("q", "quit")],
+        &[("s", "settings"), ("t", "theme"), ("q", "quit")],
         theme,
     );
 }

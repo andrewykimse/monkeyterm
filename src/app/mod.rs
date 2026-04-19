@@ -143,6 +143,9 @@ pub struct App {
 
     // Theme picker state
     pub theme_picker_selected: usize,
+
+    // Settings screen state
+    pub settings_selected: usize,
 }
 
 impl App {
@@ -195,6 +198,7 @@ impl App {
             live_accuracy: 0.0,
             last_result: None,
             theme_picker_selected: 0,
+            settings_selected: 0,
         })
     }
 
@@ -270,6 +274,9 @@ impl App {
                 self.config.default_mode = Config::test_mode_from(&self.mode);
                 let _ = self.config.save();
                 self.start_test();
+            }
+            KeyCode::Char('s') => {
+                self.screen = Screen::Settings;
             }
             _ => {}
         }
@@ -383,8 +390,54 @@ impl App {
     }
 
     fn handle_settings_key(&mut self, key: KeyEvent) {
+        const NUM_SETTINGS: usize = 3;
         match key.code {
             KeyCode::Esc | KeyCode::Char('q') => self.screen = Screen::Home,
+            KeyCode::Up | KeyCode::Char('k') => {
+                if self.settings_selected > 0 {
+                    self.settings_selected -= 1;
+                } else {
+                    self.settings_selected = NUM_SETTINGS - 1;
+                }
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                self.settings_selected = (self.settings_selected + 1) % NUM_SETTINGS;
+            }
+            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
+                match self.settings_selected {
+                    0 => {
+                        // Cycle theme
+                        let themes = Theme::all();
+                        self.theme_index = (self.theme_index + 1) % themes.len();
+                        self.theme = themes[self.theme_index].clone();
+                        self.config.theme = self.theme.name.clone();
+                        let _ = self.config.save();
+                    }
+                    1 => {
+                        // Toggle word list
+                        self.word_list = match self.word_list {
+                            WordList::Common200 => WordList::Programming,
+                            WordList::Programming => WordList::Common200,
+                        };
+                        self.config.word_list = Config::word_list_from(&self.word_list);
+                        let _ = self.config.save();
+                    }
+                    2 => {
+                        // Cycle default mode
+                        let modes = [
+                            "words:25", "words:50", "words:100",
+                            "time:30", "time:60", "time:120", "quote",
+                        ];
+                        let current = self.config.default_mode.as_str();
+                        let idx = modes.iter().position(|&m| m == current).unwrap_or(0);
+                        let next = modes[(idx + 1) % modes.len()];
+                        self.config.default_mode = next.to_string();
+                        self.mode = self.config.test_mode();
+                        let _ = self.config.save();
+                    }
+                    _ => {}
+                }
+            }
             _ => {}
         }
     }
