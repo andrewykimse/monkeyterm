@@ -88,3 +88,108 @@ impl History {
             .max_by(|a, b| a.wpm.partial_cmp(&b.wpm).unwrap_or(std::cmp::Ordering::Equal))
     }
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_entry(wpm: f64, mode: &str) -> HistoryEntry {
+        HistoryEntry {
+            wpm,
+            raw_wpm: wpm,
+            accuracy: 100.0,
+            correct_chars: 50,
+            incorrect_chars: 0,
+            duration_secs: 30.0,
+            mode: mode.to_string(),
+            timestamp: 0,
+        }
+    }
+
+    #[test]
+    fn personal_best_empty_history() {
+        let h = History::default();
+        assert!(h.personal_best("words 50").is_none());
+    }
+
+    #[test]
+    fn personal_best_returns_highest_wpm() {
+        let mut h = History::default();
+        h.entries.push(make_entry(60.0, "words 50"));
+        h.entries.push(make_entry(80.0, "words 50"));
+        h.entries.push(make_entry(70.0, "words 50"));
+        let pb = h.personal_best("words 50").unwrap();
+        assert_eq!(pb.wpm, 80.0);
+    }
+
+    #[test]
+    fn personal_best_filters_by_mode() {
+        let mut h = History::default();
+        h.entries.push(make_entry(100.0, "time 60s"));
+        h.entries.push(make_entry(50.0, "words 50"));
+        // PB for words 50 should not be influenced by the time 60s entry
+        let pb = h.personal_best("words 50").unwrap();
+        assert_eq!(pb.wpm, 50.0);
+        assert!(h.personal_best("time 60s").is_some());
+    }
+
+    #[test]
+    fn personal_best_unknown_mode_returns_none() {
+        let mut h = History::default();
+        h.entries.push(make_entry(80.0, "words 50"));
+        assert!(h.personal_best("words 25").is_none());
+    }
+
+    #[test]
+    fn add_caps_history_at_1000_entries() {
+        let mut h = History::default();
+        // Pre-fill to 999 entries
+        for i in 0..999 {
+            h.entries.push(make_entry(i as f64, "words 50"));
+        }
+        assert_eq!(h.entries.len(), 999);
+
+        // Adding one more brings us to 1000 — no drain yet
+        h.entries.push(make_entry(999.0, "words 50"));
+        assert_eq!(h.entries.len(), 1000);
+
+        // Now add via add() which triggers the drain
+        use std::time::Duration;
+        use crate::app::TestResult;
+        let result = TestResult {
+            wpm: 85.0,
+            raw_wpm: 90.0,
+            accuracy: 98.0,
+            correct_chars: 250,
+            incorrect_chars: 5,
+            duration: Duration::from_secs(30),
+            mode: "words 50".to_string(),
+        };
+        h.add(&result);
+        assert_eq!(h.entries.len(), 1000);
+    }
+
+    #[test]
+    fn add_stores_correct_wpm() {
+        use std::time::Duration;
+        use crate::app::TestResult;
+        let mut h = History::default();
+        let result = TestResult {
+            wpm: 75.5,
+            raw_wpm: 80.0,
+            accuracy: 95.0,
+            correct_chars: 200,
+            incorrect_chars: 10,
+            duration: Duration::from_secs(60),
+            mode: "words 100".to_string(),
+        };
+        h.add(&result);
+        assert_eq!(h.entries.len(), 1);
+        assert_eq!(h.entries[0].wpm, 75.5);
+        assert_eq!(h.entries[0].mode, "words 100");
+    }
+}

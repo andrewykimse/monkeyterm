@@ -101,3 +101,74 @@ pub fn get_quote() -> String {
     let mut rng = thread_rng();
     PANGRAMS.choose(&mut rng).unwrap().to_string()
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generate_word_list_returns_exact_count() {
+        let words = generate_word_list(&WordList::Common200, 25);
+        assert_eq!(words.len(), 25);
+    }
+
+    #[test]
+    fn generate_word_list_zero_returns_empty() {
+        let words = generate_word_list(&WordList::Common200, 0);
+        assert_eq!(words.len(), 0);
+    }
+
+    #[test]
+    fn generate_word_list_more_than_available_fills_to_count() {
+        // Common200 has ~200 unique words; request 500 → should still give 500
+        let words = generate_word_list(&WordList::Common200, 500);
+        assert_eq!(words.len(), 500);
+    }
+
+    #[test]
+    fn generate_word_list_all_non_empty_strings() {
+        let words = generate_word_list(&WordList::Common200, 50);
+        for w in &words {
+            assert!(!w.is_empty(), "generated an empty word");
+        }
+    }
+
+    #[test]
+    fn generate_word_list_programming_uses_programming_words() {
+        let words = generate_word_list(&WordList::Programming, 30);
+        assert_eq!(words.len(), 30);
+        // Programming words should all be ASCII
+        for w in &words {
+            assert!(w.is_ascii(), "programming word '{w}' is not ASCII");
+        }
+    }
+
+    #[test]
+    fn word_list_names() {
+        assert_eq!(WordList::Common200.name(), "english");
+        assert_eq!(WordList::Programming.name(), "code");
+    }
+
+    #[test]
+    fn get_quote_is_nonempty_multiword_string() {
+        let quote = get_quote();
+        assert!(!quote.is_empty());
+        assert!(quote.contains(' '), "quote should contain at least two words");
+    }
+
+    #[test]
+    fn get_quote_is_from_known_set() {
+        // Every returned quote must exist in PANGRAMS
+        for _ in 0..20 {
+            let q = get_quote();
+            assert!(
+                PANGRAMS.contains(&q.as_str()),
+                "get_quote returned unknown string: {q:?}"
+            );
+        }
+    }
+}

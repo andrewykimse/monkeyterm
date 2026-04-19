@@ -146,3 +146,79 @@ impl Theme {
         Self::all().into_iter().next().unwrap()
     }
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::style::Color;
+
+    #[test]
+    fn theme_color_parses_valid_hex_with_hash() {
+        let c = ThemeColor("#ff8800".to_string());
+        assert_eq!(c.to_color(), Color::Rgb(255, 136, 0));
+    }
+
+    #[test]
+    fn theme_color_parses_valid_hex_without_hash() {
+        let c = ThemeColor("00ff00".to_string());
+        assert_eq!(c.to_color(), Color::Rgb(0, 255, 0));
+    }
+
+    #[test]
+    fn theme_color_invalid_hex_returns_reset() {
+        let c = ThemeColor("notacolor".to_string());
+        assert_eq!(c.to_color(), Color::Reset);
+    }
+
+    #[test]
+    fn theme_color_black_and_white() {
+        assert_eq!(ThemeColor("#000000".to_string()).to_color(), Color::Rgb(0, 0, 0));
+        assert_eq!(ThemeColor("#ffffff".to_string()).to_color(), Color::Rgb(255, 255, 255));
+    }
+
+    #[test]
+    fn theme_all_is_nonempty() {
+        assert!(!Theme::all().is_empty());
+    }
+
+    #[test]
+    fn theme_all_names_are_unique() {
+        let themes = Theme::all();
+        let mut names: Vec<&str> = themes.iter().map(|t| t.name.as_str()).collect();
+        let original_len = names.len();
+        names.dedup();
+        // Sort first for dedup to catch all duplicates
+        let mut sorted: Vec<&str> = themes.iter().map(|t| t.name.as_str()).collect();
+        sorted.sort_unstable();
+        sorted.dedup();
+        assert_eq!(sorted.len(), original_len, "duplicate theme names found");
+    }
+
+    #[test]
+    fn theme_by_name_finds_known_themes() {
+        assert!(Theme::by_name("serika_dark").is_some());
+        assert!(Theme::by_name("dracula").is_some());
+        assert!(Theme::by_name("nord").is_some());
+    }
+
+    #[test]
+    fn theme_by_name_returns_none_for_unknown() {
+        assert!(Theme::by_name("nonexistent_theme_xyz").is_none());
+    }
+
+    #[test]
+    fn theme_by_name_returns_correct_theme() {
+        let theme = Theme::by_name("dracula").unwrap();
+        assert_eq!(theme.name, "dracula");
+    }
+
+    #[test]
+    fn default_theme_is_serika_dark() {
+        let theme = Theme::default_theme();
+        assert_eq!(theme.name, "serika_dark");
+    }
+}

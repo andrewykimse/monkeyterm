@@ -581,26 +581,50 @@ impl App {
     }
 
     fn count_chars(&self) -> (usize, usize) {
-        let mut correct = 0;
-        let mut incorrect = 0;
-        for (i, word) in self.words.iter().enumerate() {
-            if i >= self.current_word {
-                break;
-            }
-            for (j, typed) in word.typed.iter().enumerate() {
-                if word.expected.get(j) == Some(typed) {
-                    correct += 1;
-                } else {
-                    incorrect += 1;
-                }
-            }
-            // extra chars beyond expected length
-            if word.typed.len() > word.expected.len() {
-                incorrect += word.typed.len() - word.expected.len();
+        count_chars_in(&self.words, self.current_word)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Pure helper functions (extracted for testability)
+// ---------------------------------------------------------------------------
+
+/// Count correct and incorrect keystrokes across `words[0..up_to]`.
+pub fn count_chars_in(words: &[WordState], up_to: usize) -> (usize, usize) {
+    let mut correct = 0;
+    let mut incorrect = 0;
+    for (i, word) in words.iter().enumerate() {
+        if i >= up_to {
+            break;
+        }
+        for (j, typed) in word.typed.iter().enumerate() {
+            if word.expected.get(j) == Some(typed) {
+                correct += 1;
+            } else {
+                // Covers both mistyped chars and extra chars beyond word length
+                // (expected.get(j) returns None for j >= expected.len())
+                incorrect += 1;
             }
         }
-        (correct, incorrect)
     }
+    (correct, incorrect)
+}
+
+/// Compute (wpm, raw_wpm, accuracy) from raw counts and elapsed seconds.
+pub fn calculate_stats(correct: usize, incorrect: usize, duration_secs: f64) -> (f64, f64, f64) {
+    let minutes = duration_secs / 60.0;
+    let raw_wpm = (correct + incorrect) as f64 / 5.0 / minutes;
+    let wpm = correct as f64 / 5.0 / minutes;
+    let accuracy = if correct + incorrect > 0 {
+        correct as f64 / (correct + incorrect) as f64 * 100.0
+    } else {
+        100.0
+    };
+    (wpm, raw_wpm, accuracy)
+}
+
+// Keep `impl App` open for the tick method below
+impl App {
 
     // -----------------------------------------------------------------------
     // Tick (called each frame)
@@ -647,5 +671,144 @@ impl App {
                 self.last_sample_second = current_second;
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ---- WordState ----
+
+    #[test]
+    fn word_state_untyped_chars_are_untyped() {
+        let w = WordState::new("hello");
+        assert_eq!(w.char_state(0), CharState::Untyped);
+        assert_eq!(w.char_state(4), CharState::Untyped);
+    }
+
+    #[test]
+    fn word_state_correct_chars() {
+        let mut w = WordState::new("hello");
+        w.typed = "hel".chars().collect();
+        assert_eq!(w.char_state(0), CharState::Correct);
+        assert_eq!(w.char_state(2), CharState::Correct);
+        assert_eq!(w.char_state(3), CharState::Untyped);
+    }
+
+    #[test]
+    fn word_state_incorrect_char() {
+        let mut w = WordState::new("hello");
+        w.typed = "helXo".chars().collect();
+        assert_eq!(w.char_state(3), CharState::Incorrect);
+        assert_eq!(w.char_state(0), CharState::Correct);
+    }
+
+    #[test]
+    fn word_state_is_correct_when_fully_typed() {
+        let mut w = WordState::new("hello");
+        w.typed = "hello".chars().collect();
+        assert!(w.is_correct());
+        assert!(w.is_complete());
+    }
+
+    #[test]
+    fn word_state_is_not_correct_with_typo() {
+        let mut w = WordState::new("hello");
+        w.typed = "hellx".chars().collect();
+        assert!(!w.is_correct());
+        assert!(w.is_complete());
+    }
+
+    #[test]
+    fn word_state_not_complete_when_empty() {
+        let w = WordState::new("hello");
+        assert!(!w.is_complete());
+        assert!(!w.is_correct());
+    }
+
+    #[test]
+    fn word_state_not_complete_when_partial() {
+        let mut w = WordState::new("hello");
+        w.typed = "hel".chars().collect();
+        assert!(!w.is_complete());
+    }
+
+    // ---- count_chars_in ----
+
+    #[test]
+    fn count_chars_all_correct() {
+        let mut words = vec![WordState::new("hi"), WordState::new("yo")];
+        words[0].typed = "hi".chars().collect();
+        words[1].typed = "yo".chars().collect();
+        assert_eq!(count_chars_in(&words, 2), (4, 0));
+    }
+
+    #[test]
+    fn count_chars_with_typo() {
+        let mut words = vec![WordState::new("hello")];
+        words[0].typed = "hellx".chars().collect();
+        // h e l l correct, x incorrect
+        assert_eq!(count_chars_in(&words, 1), (4, 1));
+    }
+
+    #[test]
+    fn count_chars_with_extra_typed_chars() {
+        let mut words = vec![WordState::new("hi")];
+        words[0].typed = "hiXX".chars().collect();
+        // 'h' and 'i' correct; 'X' and 'X' are extra → incorrect
+        assert_eq!(count_chars_in(&words, 1), (2, 2));
+    }
+
+    #[test]
+    fn count_chars_stops_at_current_word_boundary() {
+        let mut words = vec![WordState::new("hi"), WordState::new("yo")];
+        words[0].typed = "hi".chars().collect();
+        words[1].typed = "yo".chars().collect();
+        // Only count first word
+        assert_eq!(count_chars_in(&words, 1), (2, 0));
+    }
+
+    #[test]
+    fn count_chars_empty_words() {
+        let words: Vec<WordState> = vec![];
+        assert_eq!(count_chars_in(&words, 0), (0, 0));
+    }
+
+    // ---- calculate_stats ----
+
+    #[test]
+    fn calculate_stats_perfect_run() {
+        // 60 correct chars in 60 s → 60/5 = 12 "words" / 1 min = 12 WPM
+        let (wpm, raw_wpm, accuracy) = calculate_stats(60, 0, 60.0);
+        assert!((wpm - 12.0).abs() < 0.01);
+        assert!((raw_wpm - 12.0).abs() < 0.01);
+        assert!((accuracy - 100.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn calculate_stats_with_errors() {
+        // 80 correct + 20 incorrect in 60 s
+        let (wpm, raw_wpm, accuracy) = calculate_stats(80, 20, 60.0);
+        assert!((wpm - 16.0).abs() < 0.01);     // 80/5/1
+        assert!((raw_wpm - 20.0).abs() < 0.01); // 100/5/1
+        assert!((accuracy - 80.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn calculate_stats_no_chars_gives_100_accuracy() {
+        let (_, _, accuracy) = calculate_stats(0, 0, 10.0);
+        assert_eq!(accuracy, 100.0);
+    }
+
+    #[test]
+    fn calculate_stats_faster_typing_gives_higher_wpm() {
+        let (wpm30, _, _) = calculate_stats(60, 0, 30.0);
+        let (wpm60, _, _) = calculate_stats(60, 0, 60.0);
+        assert!(wpm30 > wpm60);
     }
 }
